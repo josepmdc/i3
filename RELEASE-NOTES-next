@@ -26,6 +26,10 @@ working. Please reach out to us in that case!
     to their definition order in the config file
   • update i3bar config when necessary (reduces redraws on bar mode changes)
   • mention rofi in default config file
+  • i3-input: add different exit codes for when i3-input fails
+  • allow ppt values in move direction and move position commands
+  • i3bar: add coordinates relative to the current output in i3bar click events
+  • i3bar: add “nonprimary” output option
 
  ┌────────────────────────────┐
  │ Bugfixes                   │
@@ -46,3 +50,5 @@ working. Please reach out to us in that case!
   • fix a bug with i3-nagbar not starting after it has already started once
   • fix conflict when moving parent of fullscreen window to workspace
   • fix Xorg memory leak with i3bar
+  • fix named workspace assignments on output changes
+  • fix named workspace assignment precedence on workspace renames

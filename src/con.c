@@ -514,8 +514,7 @@ Con *con_parent_with_orientation(Con *con, orientation_t orientation) {
 struct bfs_entry {
     Con *con;
 
-    TAILQ_ENTRY(bfs_entry)
-    entries;
+    TAILQ_ENTRY(bfs_entry) entries;
 };
 
 /*
@@ -527,9 +526,7 @@ Con *con_get_fullscreen_con(Con *con, fullscreen_mode_t fullscreen_mode) {
 
     /* TODO: is breadth-first-search really appropriate? (check as soon as
      * fullscreen levels and fullscreen for containers is implemented) */
-    TAILQ_HEAD(bfs_head, bfs_entry)
-    bfs_head = TAILQ_HEAD_INITIALIZER(bfs_head);
-
+    TAILQ_HEAD(bfs_head, bfs_entry) bfs_head = TAILQ_HEAD_INITIALIZER(bfs_head);
     struct bfs_entry *entry = smalloc(sizeof(struct bfs_entry));
     entry->con = con;
     TAILQ_INSERT_TAIL(&bfs_head, entry, entries);
@@ -1370,7 +1367,7 @@ bool con_move_to_mark(Con *con, const char *mark) {
     }
 
     /* For target containers in the scratchpad, we just send the window to the scratchpad. */
-    if (con_get_workspace(target) == workspace_get("__i3_scratch", NULL)) {
+    if (con_get_workspace(target) == workspace_get("__i3_scratch")) {
         DLOG("target container is in the scratchpad, moving container to scratchpad.\n");
         scratchpad_move(con);
         return true;

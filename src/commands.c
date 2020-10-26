@@ -129,9 +129,7 @@ static Con *maybe_auto_back_and_forth_workspace(Con *workspace) {
  */
 typedef struct owindow {
     Con *con;
-
-    TAILQ_ENTRY(owindow)
-    owindows;
+    TAILQ_ENTRY(owindow) owindows;
 } owindow;
 
 typedef TAILQ_HEAD(owindows_head, owindow) owindows_head;
@@ -359,7 +357,7 @@ void cmd_move_con_to_workspace_name(I3_CMD, const char *name, const char *no_aut
 
     LOG("should move window to workspace %s\n", name);
     /* get the workspace */
-    Con *ws = workspace_get(name, NULL);
+    Con *ws = workspace_get(name);
 
     if (no_auto_back_and_forth == NULL) {
         ws = maybe_auto_back_and_forth_workspace(ws);
@@ -390,7 +388,7 @@ void cmd_move_con_to_workspace_number(I3_CMD, const char *which, const char *no_
 
     Con *ws = get_existing_workspace_by_num(parsed_num);
     if (!ws) {
-        ws = workspace_get(which, NULL);
+        ws = workspace_get(which);
     }
 
     if (no_auto_back_and_forth == NULL) {
@@ -1399,7 +1397,7 @@ void cmd_focus(I3_CMD) {
 
     CMD_FOCUS_WARN_CHILDREN;
 
-    Con *__i3_scratch = workspace_get("__i3_scratch", NULL);
+    Con *__i3_scratch = workspace_get("__i3_scratch");
     owindow *current;
     TAILQ_FOREACH (current, &owindows, owindows) {
         Con *ws = con_get_workspace(current->con);
@@ -1492,34 +1490,37 @@ void cmd_sticky(I3_CMD, const char *action) {
 }
 
 /*
- * Implementation of 'move <direction> [<pixels> [px]]'.
+ * Implementation of 'move <direction> [<amount> [px|ppt]]'.
  *
  */
-void cmd_move_direction(I3_CMD, const char *direction_str, long move_px) {
+void cmd_move_direction(I3_CMD, const char *direction_str, long amount, const char *mode) {
     owindow *current;
     HANDLE_EMPTY_MATCH;
 
     Con *initially_focused = focused;
     direction_t direction = parse_direction(direction_str);
 
+    const bool is_ppt = mode && strcmp(mode, "ppt") == 0;
+
+    DLOG("moving in direction %s, %ld %s\n", direction_str, amount, mode);
     TAILQ_FOREACH (current, &owindows, owindows) {
-        DLOG("moving in direction %s, px %ld\n", direction_str, move_px);
         if (con_is_floating(current->con)) {
-            DLOG("floating move with %ld pixels\n", move_px);
+            DLOG("floating move with %ld %s\n", amount, mode);
             Rect newrect = current->con->parent->rect;
+            Con *output = con_get_output(current->con);
 
             switch (direction) {
                 case D_LEFT:
-                    newrect.x -= move_px;
+                    newrect.x -= is_ppt ? output->rect.width * ((double)amount / 100.0) : amount;
                     break;
                 case D_RIGHT:
-                    newrect.x += move_px;
+                    newrect.x += is_ppt ? output->rect.width * ((double)amount / 100.0) : amount;
                     break;
                 case D_UP:
-                    newrect.y -= move_px;
+                    newrect.y -= is_ppt ? output->rect.height * ((double)amount / 100.0) : amount;
                     break;
                 case D_DOWN:
-                    newrect.y += move_px;
+                    newrect.y += is_ppt ? output->rect.height * ((double)amount / 100.0) : amount;
                     break;
             }
 
@@ -1723,10 +1724,10 @@ void cmd_focus_output(I3_CMD, const char *name) {
 }
 
 /*
- * Implementation of 'move [window|container] [to] [absolute] position <px> [px] <px> [px]
+ * Implementation of 'move [window|container] [to] [absolute] position [<pos_x> [px|ppt] <pos_y> [px|ppt]]
  *
  */
-void cmd_move_window_to_position(I3_CMD, long x, long y) {
+void cmd_move_window_to_position(I3_CMD, long x, const char *mode_x, long y, const char *mode_y) {
     bool has_error = false;
 
     owindow *current;
@@ -1745,10 +1746,11 @@ void cmd_move_window_to_position(I3_CMD, long x, long y) {
         }
 
         Rect newrect = current->con->parent->rect;
+        Con *output = con_get_output(current->con);
 
-        DLOG("moving to position %ld %ld\n", x, y);
-        newrect.x = x;
-        newrect.y = y;
+        newrect.x = mode_x && strcmp(mode_x, "ppt") == 0 ? output->rect.width * ((double)x / 100.0) : x;
+        newrect.y = mode_y && strcmp(mode_y, "ppt") == 0 ? output->rect.height * ((double)y / 100.0) : y;
+        DLOG("moving to position %d %s %d %s\n", newrect.x, mode_x, newrect.y, mode_y);
 
         if (!floating_reposition(current->con->parent, newrect)) {
             yerror("Cannot move window/container out of bounds.");
@@ -2026,26 +2028,9 @@ void cmd_rename_workspace(I3_CMD, const char *old_name, const char *new_name) {
     con_attach(workspace, parent, false);
     ipc_send_workspace_event("rename", workspace, NULL);
 
-    /* Move the workspace to the correct output if it has an assignment */
-    struct Workspace_Assignment *assignment = NULL;
-    TAILQ_FOREACH (assignment, &ws_assignments, ws_assignments) {
-        if (assignment->output == NULL)
-            continue;
-        if (strcmp(assignment->name, workspace->name) != 0 && (!name_is_digits(assignment->name) || ws_name_to_number(assignment->name) != workspace->num)) {
-            continue;
-        }
-
-        Output *target_output = get_output_by_name(assignment->output, true);
-        if (!target_output) {
-            LOG("Could not get output named \"%s\"\n", assignment->output);
-            continue;
-        }
-        if (!output_triggers_assignment(target_output, assignment)) {
-            continue;
-        }
-        workspace_move_to_output(workspace, target_output);
-
-        break;
+    Con *assigned = get_assigned_output(workspace->name, workspace->num);
+    if (assigned) {
+        workspace_move_to_output(workspace, get_output_for_con(assigned));
     }
 
     bool can_restore_focus = previously_focused != NULL;
