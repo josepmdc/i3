@@ -6,7 +6,7 @@
 project(
   'i3',
   'c',
-  version: '4.18.1',
+  version: '4.19',
   default_options: [
     'c_std=c11',
     'warning_level=1',  # enable all warnings (-Wall)
@@ -289,7 +289,7 @@ else
 endif
 
 if meson.version().version_compare('>=0.53')
-  summary('build manpages (-Dmans)', get_option('docs'))
+  summary('build manpages (-Dmans)', get_option('mans'))
 endif
 
 # Required for e.g. struct ucred to be defined as per unix(7).
@@ -514,6 +514,7 @@ executable(
     'i3-config-wizard/i3-config-wizard-atoms.xmacro.h',
     'i3-config-wizard/main.c',
     'i3-config-wizard/xcb.h',
+    config_parser,
   ],
   install: true,
   include_directories: include_directories('include', 'i3-config-wizard'),
@@ -642,7 +643,7 @@ if get_option('docs')
       '@OUTPUT@',
     ],
     install: true,
-    install_dir: join_paths(get_option('datadir'), 'doc', 'i3'),
+    install_dir: docdir,
   )
 
   custom_target(
@@ -655,7 +656,7 @@ if get_option('docs')
       '@OUTPUT@',
     ],
     install: true,
-    install_dir: join_paths(get_option('datadir'), 'doc', 'i3'),
+    install_dir: docdir,
   )
 endif
 
@@ -669,7 +670,10 @@ executable(
 
 executable(
   'test.commands_parser',
-  'src/commands_parser.c',
+  [
+    'src/commands_parser.c',
+    command_parser,
+  ],
   include_directories: inc,
   c_args: '-DTEST_PARSER',
   dependencies: common_deps,
@@ -678,7 +682,10 @@ executable(
 
 executable(
   'test.config_parser',
-  'src/config_parser.c',
+  [
+    'src/config_parser.c',
+    config_parser,
+  ],
   include_directories: inc,
   c_args: '-DTEST_PARSER',
   dependencies: common_deps,
